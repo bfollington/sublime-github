@@ -1,0 +1,4 @@
+[
+   { "caption": "public_gist_from_selection", "command": "public_gist_from_selection" },
+   { "caption": "issue_at_selection", "command": "issue_at_selection" }
+]

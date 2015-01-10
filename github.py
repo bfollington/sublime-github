@@ -65,7 +65,7 @@ class GitHubApi(object):
 
     def get_token(self, username, password, one_time_password=None):
         auth_data = {
-            "scopes": ["gist"],
+            "scopes": ["gist", "repo"],
             "note": "Sublime GitHub",
             "note_url": "https://github.com/bgreenlee/sublime-github"
         }
@@ -151,6 +151,9 @@ class GitHubApi(object):
         return self.post("/gists", {"description": description,
                                     "public": public,
                                     "files": {filename: {"content": content}}})
+
+    def create_issue(self, owner, repo, title="", body=""):
+        return self.post("/repos/{}/{}/issues".format(owner, repo), {"title": title, "body": body})
 
     def get_gist(self, gist):
         data = self.get("/gists/" + gist["id"])

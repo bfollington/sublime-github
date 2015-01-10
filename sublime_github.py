@@ -350,6 +350,71 @@ class GistFromSelectionCommand(BaseGitHubCommand):
         except GitHubApi.ConnectionException as e:
             sublime.error_message(e.message)
 
+class IssueAtSelectionCommand(BaseGitHubCommand):
+    """
+    Base class for creating a Github Gist from the current selection.
+    """
+    MSG_TITLE = "Issue title:"
+    MSG_BODY = "Issue body:"
+    MSG_SUCCESS = "Issue created and url copied to the clipboard."
+
+    def run(self, edit):
+        self.title = None
+        self.body = None
+        super(IssueAtSelectionCommand, self).run(edit)
+        if self.github_token:
+            self.get_title()
+        else:
+            self.callback = self.get_description
+            self.get_token()
+
+    def get_title(self):
+        self.view.window().show_input_panel(self.MSG_TITLE, "", self.on_done_title, None, None)
+
+    def get_body(self):
+        self.view.window().show_input_panel(self.MSG_BODY, "Issue in {}".format(self.get_filename()), self.on_done_body, None, None)
+
+    def get_filename(self):
+        # use the current filename as the default
+        current_filename = self.view.file_name()
+        return os.path.basename(current_filename)
+
+    def on_done_title(self, value):
+        "Callback for title show_input_panel."
+        self.title = value
+        # need to do this or the input panel doesn't show
+        sublime.set_timeout(self.get_body, 50)
+
+    def on_done_body(self, value):
+        self.body = value
+
+        # get selected text, or the whole file if nothing selected
+        if all([region.empty() for region in self.view.sel()]):
+            text = self.view.substr(sublime.Region(0, self.view.size()))
+        else:
+            text = "\n".join([self.view.substr(region) for region in self.view.sel()])
+
+        try:
+
+            # take selection as code
+            final_body = self.body + "\n\n```\n" + text + "\n```"
+
+            issue = self.gistapi.create_issue("bfollington", "evernote-printable", title=self.title, body=final_body)
+            self.view.settings().set('issue', issue)
+            sublime.set_clipboard(issue["html_url"])
+            webbrowser.open(issue["html_url"])
+            sublime.status_message(self.MSG_SUCCESS)
+        except GitHubApi.UnauthorizedException:
+            # clear out the bad token so we can reset it
+            self.settings.set("github_token", "")
+            sublime.save_settings("GitHub.sublime-settings")
+            sublime.error_message(self.ERR_UNAUTHORIZED_TOKEN)
+            sublime.set_timeout(self.get_username, 50)
+        except GitHubApi.UnknownException as e:
+            sublime.error_message(e.message)
+        except GitHubApi.ConnectionException as e:
+            sublime.error_message(e.message)
+
 class PrivateGistFromSelectionCommand(GistFromSelectionCommand):
     """
     Command to create a private Github gist from the current selection.
@@ -462,6 +527,16 @@ else:
     class RemoteUrlCommand(sublime_plugin.TextCommand):
         def run(self, edit):
             sublime.error_message("I couldn't find the Git plugin. Please install it, restart Sublime Text, and try again.")
+
+
+class OpenRemoteUrlCommand(RemoteUrlCommand):
+    allows_line_highlights = True
+
+    def run(self, edit):
+        super(OpenRemoteUrlCommand, self).run(edit)
+
+    def on_done(self):
+        webbrowser.open(self.url)
 
 
 class OpenRemoteUrlCommand(RemoteUrlCommand):
